@@ -44,7 +44,10 @@ Any one of these:
    **AutoCAD 2018 DXF (\*.dxf)** as the file type and save. DXF is AutoCAD's text-based
    exchange format, and this project reads it directly (`autocad-ai inspect file.dxf`).
 2. **A PDF of the sheets.** In AutoCAD use `EXPORTPDF`, or plot to "DWG To PDF.pc3". This
-   shows the dimensions and room layout, but it is less exact than DXF.
+   shows the dimensions and room layout, but it is less exact than DXF. With only
+   **AutoCAD Web** (browser): upload and open the DWG, open a layout tab, then use the
+   `PLOT` command (or the Plot icon at the top right) to create the PDF. AutoCAD Web
+   cannot save as DXF.
 3. **Permission to run a DWG converter** (LibreDWG, or the ODA File Converter on your own
    PC with `cad_inspect_drawing`).
 

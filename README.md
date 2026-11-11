@@ -105,6 +105,10 @@ Git are free. Run the commands in **PowerShell** (Start menu → type `PowerShel
 No AutoCAD at hand? Look at the pictures in `docs/images/`, or open
 `examples/demo-commercial-building.dxf` in Autodesk's free viewer, DWG TrueView.
 
+**AutoCAD Web (in the browser):** it opens DXF files *view-only*. Editing needs a DWG,
+and Autodesk's way to turn a DXF into a DWG is desktop AutoCAD's `SAVEAS`. AutoCAD
+Web is still handy for one job here: its `PLOT` command can export any DWG to PDF.
+
 ## Use it from Claude
 
 **Claude Code.** Claude Code can simply run `autocad-ai build ...` in this folder. To

@@ -52,5 +52,6 @@ def format_report(outputs: BuildOutputs) -> str:
     if result.warnings:
         lines += ["", "Warnings:"]
         lines += [f"- {warning}" for warning in result.warnings]
-    lines += ["", "Open the .dxf in AutoCAD (or AutoCAD LT / AutoCAD Web), then SAVEAS to keep a .dwg."]
+    lines += ["", "Open the .dxf in desktop AutoCAD or AutoCAD LT, then SAVEAS to keep a .dwg. "
+              "(AutoCAD Web can only view DXF files, not edit them.)"]
     return "\n".join(lines)
