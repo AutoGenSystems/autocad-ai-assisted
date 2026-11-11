@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autocad-ai"
+version = "0.1.0"
+description = "Describe a floor plan in YAML and get a real AutoCAD drawing; includes an MCP server for Claude."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "ezdxf>=1.4,<2",      # writes and reads AutoCAD DXF files
+    "shapely>=2.0,<3",    # 2D geometry: merges walls, cuts openings
+    "pyyaml>=6",          # reads the plan files
+    "pydantic>=2.7,<3",   # checks plan files and explains mistakes
+    "matplotlib>=3.8",    # renders PNG previews
+    "mcp>=2,<3",          # Model Context Protocol server (version 2 API)
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+autocad-ai = "autocad_ai.cli:main"
+autocad-ai-mcp = "autocad_ai.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+autocad_ai = ["plan_format.md"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
