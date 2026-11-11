@@ -147,3 +147,19 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# ---------------------------------------------------------------- Python / autocad-ai
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+build/
+
+# Generated drawings and previews (rebuild with: autocad-ai build plans/<name>.yaml)
+output/
+
+# Client drawings: this repository is public, keep original DWG files out of Git
+*.dwg
+*.bak

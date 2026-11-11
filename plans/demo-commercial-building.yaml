@@ -1,0 +1,173 @@
+# DEMO plan for the autocad-ai builder.
+#
+# The ROOM LIST comes from the sample drawing (a two-storey commercial building:
+# lounge, kitchen, service area, stockroom, men's/women's CR, conference room,
+# library/lounge, terrace). The POSITIONS AND SIZES ARE ASSUMED, because the
+# sample's geometry has not been read yet. Replace them with the real values.
+#
+# Units: millimetres. Points: [x, y]. Walls are centre lines.
+# Openings: `offset` = distance from the wall's start point to the opening's near edge.
+# Door `swing` = side it opens towards, looking from the wall's start to its end.
+
+project:
+  name: "DEMO - Two-Storey Commercial Building"
+  location: "Sample site (demo)"
+  scale: 100
+  sheet_prefix: "A-1"
+  notes:
+    - "DEMO LAYOUT: room list from the sample drawing; positions and sizes are assumed."
+    - "Areas are measured to wall centre lines."
+
+units: mm
+
+defaults:
+  wall_thickness: 150   # interior walls
+  column_size: 300
+
+grids:
+  x: [0, 6000, 12000]   # labelled 1, 2, 3
+  y: [0, 5500, 9000]    # labelled A, B, C
+
+levels:
+  # ------------------------------------------------------------------ GROUND FLOOR
+  - id: GF
+    title: GROUND FLOOR PLAN
+    columns: grid
+    walls:
+      # Exterior walls (200 mm), running anticlockwise, so the inside is on the left.
+      - start: [0, 0]
+        end: [12000, 0]
+        thickness: 200
+        openings:
+          - {type: window, offset: 400, width: 1200, tag: W1}
+          - {type: double_door, offset: 2000, width: 1800, swing: left, tag: D1}
+          - {type: window, offset: 4600, width: 1000, tag: W2}
+          - {type: window, offset: 7000, width: 3000, tag: W3}
+          - {type: window, offset: 10600, width: 1000, tag: W2}
+      - start: [12000, 0]
+        end: [12000, 9000]
+        thickness: 200
+        openings:
+          - {type: window, offset: 1500, width: 2000, tag: W4}
+      - start: [12000, 9000]
+        end: [0, 9000]
+        thickness: 200
+        openings:
+          - {type: window, offset: 400, width: 600, tag: W5}       # women's CR
+          - {type: window, offset: 1900, width: 600, tag: W5}      # men's CR
+          - {type: window, offset: 3150, width: 600, tag: W5}      # stockroom
+          - {type: door, offset: 6700, width: 900, swing: right, tag: D3}  # service exit
+          - {type: window, offset: 9500, width: 1500, tag: W6}     # kitchen
+      - start: [0, 9000]
+        end: [0, 0]
+        thickness: 200
+        openings:
+          - {type: window, offset: 1300, width: 1200, tag: W6}
+          - {type: window, offset: 5500, width: 2000, tag: W4}
+      # Interior walls (150 mm default).
+      - start: [0, 5500]
+        end: [12000, 5500]
+        openings:
+          - {type: door, offset: 1500, width: 900, swing: left, tag: D2}   # kitchen
+          - {type: door, offset: 4400, width: 900, swing: left, tag: D2}   # service area
+          - {type: door, offset: 9300, width: 700, swing: left, tag: D4}   # men's CR
+          - {type: door, offset: 10900, width: 700, swing: left, tag: D4}  # women's CR
+      - start: [4000, 5500]
+        end: [4000, 9000]
+      - start: [7000, 5500]
+        end: [7000, 9000]
+        openings:
+          - {type: door, offset: 400, width: 800, swing: right, tag: D5}   # stockroom
+      - start: [9000, 5500]
+        end: [9000, 9000]
+      - start: [10500, 5500]
+        end: [10500, 9000]
+    rooms:
+      - {name: LOUNGE, boundary: [[0, 0], [12000, 0], [12000, 5500], [0, 5500]], label_at: [3000, 2800]}
+      - {name: KITCHEN, boundary: [[0, 5500], [4000, 5500], [4000, 9000], [0, 9000]]}
+      - {name: "SERVICE\nAREA", boundary: [[4000, 5500], [7000, 5500], [7000, 9000], [4000, 9000]]}
+      - {name: STOCKROOM, boundary: [[7000, 5500], [9000, 5500], [9000, 9000], [7000, 9000]], label_at: [8000, 7600]}
+      - {name: "MEN\nCR", boundary: [[9000, 5500], [10500, 5500], [10500, 9000], [9000, 9000]], label_at: [9750, 7250]}
+      - {name: "WOMEN\nCR", boundary: [[10500, 5500], [12000, 5500], [12000, 9000], [10500, 9000]], label_at: [11250, 7250]}
+    stairs:
+      - {start: [7650, 1000], width: 1300, length: 4250, direction: 90, risers: 18, label: UP}
+    fixtures:
+      - {kind: kitchen_sink, at: [2000, 8900], rotation: 180}
+      - {kind: lavatory, at: [9440, 8900], rotation: 180}
+      - {kind: wc, at: [10120, 8900], rotation: 180}
+      - {kind: lavatory, at: [10940, 8900], rotation: 180}
+      - {kind: wc, at: [11600, 8900], rotation: 180}
+    dimensions:
+      - {p1: [8300, 1000], p2: [8300, 5250], offset: -700}   # stair run
+
+  # ------------------------------------------------------------------ SECOND FLOOR
+  - id: 2F
+    title: SECOND FLOOR PLAN
+    columns: [[0, 5500], [6000, 5500], [12000, 5500], [0, 9000], [6000, 9000], [12000, 9000]]
+    walls:
+      # Terrace railing (100 mm) along the front edge of the slab.
+      - {start: [0, 0], end: [12000, 0], thickness: 100}
+      - {start: [0, 0], end: [0, 2500], thickness: 100}
+      - {start: [12000, 0], end: [12000, 2500], thickness: 100}
+      # Exterior walls of the enclosed second floor.
+      - start: [0, 2500]
+        end: [12000, 2500]
+        thickness: 200
+        openings:
+          - {type: window, offset: 400, width: 1000, tag: W2}
+          - {type: double_door, offset: 2100, width: 1800, swing: right, tag: D1}   # to terrace
+          - {type: window, offset: 4400, width: 1200, tag: W7}
+          - {type: window, offset: 7050, width: 1200, tag: W7}                     # lights the stair
+          - {type: door, offset: 9400, width: 900, swing: right, tag: D2}           # to terrace
+          - {type: window, offset: 10700, width: 900, tag: W2}
+      - start: [12000, 2500]
+        end: [12000, 9000]
+        thickness: 200
+        openings:
+          - {type: window, offset: 1000, width: 1500, tag: W6}
+          - {type: window, offset: 4000, width: 1500, tag: W6}
+      - start: [12000, 9000]
+        end: [0, 9000]
+        thickness: 200
+        openings:
+          - {type: window, offset: 800, width: 1400, tag: W6}      # library
+          - {type: window, offset: 3300, width: 600, tag: W5}      # women's CR
+          - {type: window, offset: 4800, width: 600, tag: W5}      # men's CR
+          - {type: window, offset: 7500, width: 3000, tag: W3}     # conference room
+      - start: [0, 9000]
+        end: [0, 2500]
+        thickness: 200
+        openings:
+          - {type: window, offset: 700, width: 2000, tag: W4}
+          - {type: window, offset: 4000, width: 2000, tag: W4}
+      # Interior walls.
+      - start: [6000, 2500]
+        end: [6000, 9000]
+        openings:
+          - {type: door, offset: 700, width: 900, swing: left, tag: D2}    # conference room
+      - start: [9000, 2500]
+        end: [9000, 9000]
+        openings:
+          - {type: door, offset: 2850, width: 800, swing: right, tag: D5}  # library
+      - start: [6000, 6300]
+        end: [9000, 6300]
+        openings:
+          - {type: door, offset: 300, width: 700, swing: left, tag: D4}    # men's CR
+          - {type: door, offset: 1800, width: 700, swing: left, tag: D4}   # women's CR
+      - {start: [7500, 6300], end: [7500, 9000]}
+      # Railings (50 mm) on both sides of the stair opening.
+      - {start: [7000, 2500], end: [7000, 5250], thickness: 50}
+      - {start: [8300, 2500], end: [8300, 5250], thickness: 50}
+    rooms:
+      - {name: TERRACE, boundary: [[0, 0], [12000, 0], [12000, 2500], [0, 2500]]}
+      - {name: "CONFERENCE\nROOM", boundary: [[0, 2500], [6000, 2500], [6000, 9000], [0, 9000]]}
+      - {name: "LIBRARY/\nLOUNGE", boundary: [[9000, 2500], [12000, 2500], [12000, 9000], [9000, 9000]], label_at: [10500, 7400]}
+      - {name: "MEN CR", boundary: [[6000, 6300], [7500, 6300], [7500, 9000], [6000, 9000]], label_at: [6750, 7700]}
+      - {name: "WOMEN\nCR", boundary: [[7500, 6300], [9000, 6300], [9000, 9000], [7500, 9000]], label_at: [8250, 7650]}
+    stairs:
+      - {start: [7650, 5250], width: 1300, length: 2500, direction: 270, risers: 11, label: DN}
+    fixtures:
+      - {kind: lavatory, at: [6440, 8900], rotation: 180}
+      - {kind: wc, at: [7120, 8900], rotation: 180}
+      - {kind: lavatory, at: [7900, 8900], rotation: 180}
+      - {kind: wc, at: [8600, 8900], rotation: 180}
