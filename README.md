@@ -87,7 +87,7 @@ Git are free. Run the commands in **PowerShell** (Start menu → type `PowerShel
    ```bash
    pytest
    ```
-   The last line should say `28 passed`.
+   The last line should say `35 passed`.
 
 ### Phase 3: build the demo and open it in AutoCAD
 
@@ -160,12 +160,14 @@ you say so.
 
 ## The sample project you shared
 
-The sample (a two-storey commercial building) is only **partly** rebuilt so far. Its room
-list and sheet list were read from the DWG files, but the exact wall and door geometry
-could not be decoded in the cloud sandbox. `plans/demo-commercial-building.yaml` therefore
-uses the real rooms in an **assumed layout**, and says so in every title block. To finish
-it, a DXF or PDF export of the drawing is needed; see
+The ground and second floor plans of the sample (a two-storey commercial building) have
+been **rebuilt from the original drawing's geometry** and checked by overlaying them on
+the original. The plan file of that design is kept out of this public repository until
+its owner agrees to publish it. How it was done, and the deliberate differences, are in
 **[docs/sample-project-notes.md](docs/sample-project-notes.md)**.
+
+`plans/demo-commercial-building.yaml` is an older **demo** with an *assumed* layout. Its
+title blocks say so. It stays as an example of grids, columns and automatic dimensions.
 
 ## Repository layout
 
@@ -181,7 +183,7 @@ src/autocad_ai/
   mcp_server.py                the MCP server (9 tools) for Claude
   cli.py                       the autocad-ai command
   plan_format.md               plan format reference (also served to Claude)
-tests/                         28 automated tests (pytest)
+tests/                         35 automated tests (pytest)
 docs/                          Autodesk MCP guide, sample-project notes, preview images
 examples/                      the demo drawing, ready to open in AutoCAD
 ```
@@ -189,8 +191,9 @@ examples/                      the demo drawing, ready to open in AutoCAD
 ## Limitations (version 0.1)
 
 - Floor plans only: no elevations, sections, foundation or roof framing plans yet.
-- Straight walls. A small built-in library of doors, windows, WC, lavatory, kitchen
-  sink and urinal.
+- Straight walls. A small built-in library: hinged, double and sliding doors, windows,
+  WC, lavatory, kitchen sink, urinal, and simple furniture symbols (sofas, tables,
+  desk, hutch, plants, piano, dining set, refrigerator, range, wet bar, stools).
 - Output is DXF (AutoCAD 2013 format). Use SAVEAS in AutoCAD for DWG.
 - The drawings pass `ezdxf`'s structural audit, but they have not yet been opened in
   AutoCAD itself during development. Please report anything that looks wrong.

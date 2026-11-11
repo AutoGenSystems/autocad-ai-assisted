@@ -42,7 +42,7 @@ class _Model(BaseModel):
 class Opening(_Model):
     """A door, window or plain opening cut into its wall."""
 
-    type: Literal["door", "double_door", "window", "opening"]
+    type: Literal["door", "double_door", "sliding_door", "window", "opening"]
     offset: float = Field(ge=0, description="mm from the wall's start point to the opening's near edge")
     width: float = Field(gt=0, description="clear width in mm")
     hinge: Literal["start", "end"] = Field(
@@ -82,7 +82,9 @@ class Stair(_Model):
     length: float = Field(gt=0, description="horizontal run in mm")
     direction: float = Field(90, description="travel direction in degrees, 0 = +x, 90 = +y")
     risers: int = Field(18, ge=2)
-    label: str = Field("UP", description="usually UP on the lower floor and DN on the upper floor")
+    label: str = Field("UP", description="UP on the lower floor, DN on the upper floor; '' for no label "
+                                         "(e.g. the second flight of an L-shaped stair)")
+    label_at: Point | None = Field(None, description="where to write the label; default: just before the first step")
 
 
 class Fixture(_Model):
@@ -91,10 +93,40 @@ class Fixture(_Model):
     rotation: float = Field(0, description="degrees; 0 = fixture faces +y, 180 = faces -y")
 
 
+FurnitureKind = Literal["sofa", "loveseat", "table", "desk", "hutch", "plant", "piano", "dining_set",
+                        "refrigerator", "range", "wet_bar", "stool"]
+
+
+class Furniture(_Model):
+    """Loose furniture drawn as a simple symbol, sized to `size` and turned by `rotation`."""
+
+    kind: FurnitureKind
+    at: Point = Field(description="centre of the item's footprint")
+    size: tuple[float, float] = Field(description="[width, depth] in mm before rotation; the back is the +y side")
+    rotation: float = Field(0, description="degrees anticlockwise; 0 = back towards +y")
+
+
+class Lines(_Model):
+    """Plain lines for things that are not walls: counters, toilet partitions, railings..."""
+
+    points: list[Point] = Field(min_length=2)
+    closed: bool = False
+    layer: Literal["casework", "partition", "railing", "outline", "furniture"] = "outline"
+
+
 class Dimension(_Model):
     p1: Point
     p2: Point
-    offset: float = Field(800, description="mm from the measured points to the dimension line")
+    kind: Literal["aligned", "horizontal", "vertical"] = Field(
+        "aligned", description="aligned = true distance; horizontal/vertical = only the x or y difference")
+    offset: float = Field(800, description="aligned only: mm from the measured points to the dimension line")
+    at: Point | None = Field(None, description="horizontal/vertical: any point on the dimension line")
+
+    @model_validator(mode="after")
+    def _needs_line_position(self) -> "Dimension":
+        if self.kind != "aligned" and self.at is None:
+            raise ValueError("horizontal and vertical dimensions need `at`, a point on the dimension line")
+        return self
 
 
 class Note(_Model):
@@ -112,8 +144,11 @@ class Level(_Model):
     rooms: list[Room] = Field(default_factory=list)
     stairs: list[Stair] = Field(default_factory=list)
     fixtures: list[Fixture] = Field(default_factory=list)
+    furniture: list[Furniture] = Field(default_factory=list)
+    lines: list[Lines] = Field(default_factory=list)
     columns: Literal["grid", "none"] | list[Point] = Field(
         "grid", description="'grid' = a column at every grid intersection, or a list of points")
+    auto_dimensions: bool = Field(True, description="add grid (or overall) dimension chains automatically")
     dimensions: list[Dimension] = Field(default_factory=list)
     notes: list[Note] = Field(default_factory=list)
 
@@ -151,6 +186,10 @@ class Project(_Model):
     name: str
     scale: int = Field(100, ge=1, description="drawing scale 1:scale, e.g. 100")
     sheet_prefix: str = Field("A-1", description="sheet numbers become <prefix>01, <prefix>02, ...")
+    sheet_size: Literal["A4", "A3", "A2", "A1"] = "A3"
+    sheet_orientation: Literal["landscape", "portrait"] = "landscape"
+    dimension_unit: Literal["mm", "m"] = Field(
+        "mm", description="unit shown in dimension text; 'm' shows 15.00 for 15000 mm (drawing stays in mm)")
     location: str | None = None
     notes: list[str] = Field(default_factory=list, description="printed in every title block")
 

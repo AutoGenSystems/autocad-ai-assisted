@@ -1,62 +1,59 @@
-# Sample project: what was found, and what is still needed
+# Sample project: how the floor plans were rebuilt
 
-The sample is a set of two DWG drawings for a **two-storey commercial building**. The
-goal is to rebuild it as a plan file, so that it can be regenerated, changed and extended
-with Claude. This page records how far that got.
+The sample is a set of two DWG drawings for a **two-storey commercial building**:
+ground and second floor plans, a foundation plan, a roof framing plan, four
+elevations and a 3D model. The **ground and second floor plans have been rebuilt**
+as a plan file from the original geometry, so they can now be regenerated, changed
+and extended with Claude.
 
-> The original DWG files are **not** in this repository. The repository is public, and
-> client drawings can contain names, addresses and other private details. Keep them out
-> of Git unless you are sure they may be shared.
+> The original DWG files, and the rebuilt plan file of that design, are **not**
+> committed to this repository. The repository is public, and a client's design
+> should only be published with their agreement. `*.dwg` is in `.gitignore` to
+> prevent accidents.
 
-## What could be read
+## How it was done
 
-The files are in AutoCAD 2018 DWG format, last saved by AutoCAD 2024. They were read
-with a small, purpose-written reader that unpacks the DWG container and lists its text.
-It does not decode geometry; see the next section for why.
+1. **DWG → DXF.** The DWG files were converted to DXF with LibreDWG (open-source,
+   GNU project) compiled to WebAssembly. This ran with the user's approval, in the
+   temporary cloud machine.
+2. **3D removed.** The 3D solids and surfaces were stripped, because floor plans are 2D
+   and one surface object could not be read.
+3. **Geometry read.** The original uses these layers:
+   - `GFPW` / `SFPW`: walls, drawn as thick polylines along their centre lines. Width
+     0.15 m is exterior, 0.10 m is interior. Each gap between two pieces is an opening.
+   - `GFPD&W` / `SFPD&W`: doors (dynamic "Door - Metric" blocks, which show the hinge and
+     swing), window frames, the stair, fixtures and furniture.
+   - `FPD` and `0`: dimension strings. `TEXT`: room names.
+4. **Plan file written.** Every wall, opening, stair flight, fixture, piece of
+   furniture and dimension was converted from metres to millimetres, measured from the
+   front-left corner of the building.
+5. **Checked against the original.** The rebuilt drawing was overlaid on the original,
+   with the original in red and the rebuild in black. Walls, door swings, windows,
+   fixtures, furniture, counters and stairs coincide on both floors, and the room names
+   sit where the original has them.
 
-| Item | Found |
-|---|---|
-| Views | Ground floor plan, second floor plan, foundation plan, roof framing plan, front / rear / left / right elevations, a 3D view |
-| Ground floor rooms | Lounge, kitchen, service area, stockroom, men's CR, women's CR (CR = comfort room, a toilet) |
-| Second floor rooms | Conference room, library / lounge, terrace (plus CRs) |
-| Standards | Metric (ISO-25 dimension style), Arial text, ISO A4 sheets, CENTER / HIDDEN linetypes |
-| Doors, fixtures, furniture | AutoCAD DesignCenter blocks: dynamic metric doors, toilets, sinks, kitchen range, refrigerator, sofas, tables, desks |
-| Layer names (examples) | grid lines, ground / second floor doors and windows, columns, roof, roof slope, elevation, 3D floors and roof |
-| 3D | One file contains a large amount of 3D solid data (a 3D model of the building) |
+## What the rebuild contains
 
-## What could not be read yet, and why
+Both floors: every wall and opening, the L-shaped stair, the CR fixtures, the kitchen
+equipment, the furniture, the room names and the original dimension strings (in
+metres). The output is two A3 portrait sheets at 1:100, **A-101 GROUND FLOOR PLAN** and
+**A-102 SECOND FLOOR PLAN**. The builder features this needed (sliding doors,
+furniture, plain lines, horizontal/vertical dimensions, metre dimensions, portrait
+sheets) are general, documented in the plan format, and covered by tests.
 
-The exact **geometry** is missing: wall positions, door and window positions, and
-dimensions. DWG stores these as packed binary data. Decoding it needs a full DWG
-library, such as the open-source LibreDWG or the ODA File Converter. In the cloud
-sandbox used for this work, the safety checks blocked running downloaded third-party
-DWG software, so it was not used.
+## Deliberate differences from the original
 
-Because of that, `plans/demo-commercial-building.yaml` uses the **real room list** with
-an **assumed layout**. Its title blocks say so. Treat it as a test of the pipeline, not as
-the sample design.
+- **Interior partitions** drawn in the original as single lines are shown as 100 mm walls.
+- **Furniture and fixtures** use simple symbols at the original's positions, sizes and
+  rotations, instead of AutoCAD's DesignCenter blocks. Lavatories are the builder's
+  standard 550 × 450 mm size, slightly larger than the original's 460 × 375 mm.
+- **The second floor's overall width** reads 15.00. The original's overall dimension
+  was drawn to the outer face of a window frame and read 15.08.
+- **Floor areas** were added for the kitchen, stockroom, terrace and conference room.
+  The original has none.
+- **Two-line room names** (WOMEN / CR) are centred. In the original they are left-aligned.
 
-## What is needed to rebuild the sample exactly
+## Not rebuilt yet
 
-Any one of these:
-
-1. **A DXF export** (best). In AutoCAD, open the drawing and run `SAVEAS`. Choose
-   **AutoCAD 2018 DXF (\*.dxf)** as the file type and save. DXF is AutoCAD's text-based
-   exchange format, and this project reads it directly (`autocad-ai inspect file.dxf`).
-2. **A PDF of the sheets.** In AutoCAD use `EXPORTPDF`, or plot to "DWG To PDF.pc3". This
-   shows the dimensions and room layout, but it is less exact than DXF. With only
-   **AutoCAD Web** (browser): upload and open the DWG, open a layout tab, then use the
-   `PLOT` command (or the Plot icon at the top right) to create the PDF. AutoCAD Web
-   cannot save as DXF.
-3. **Permission to run a DWG converter** (LibreDWG, or the ODA File Converter on your own
-   PC with `cad_inspect_drawing`).
-
-Then the steps are:
-
-1. Inspect the DXF: layers, block positions (doors, windows, fixtures), grid lines, text.
-2. Convert walls, openings, grids, rooms and stairs into a new plan file:
-   `plans/sample-commercial-building.yaml`.
-3. Build it. Compare it with the original side by side, and in AutoCAD with Autodesk
-   Assistant's `checkAutoCADObjects` (see [the Autodesk MCP guide](autodesk-mcp-guide.md)).
-4. Later, if wanted: foundation plan, roof framing plan and elevations. These are other
-   drawing types that the builder does not make yet.
+The foundation plan, roof framing plan, elevations and 3D model. The builder does not
+draw those drawing types yet.

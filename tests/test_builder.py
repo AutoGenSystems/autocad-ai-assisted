@@ -103,7 +103,7 @@ levels:
     walls: [{start: [0, 0], end: [60000, 0], thickness: 200}]
 """)
     _doc, result = build_document(plan)
-    assert any("does not fit an A3 sheet" in warning for warning in result.warnings)
+    assert any("does not fit an A3 landscape sheet" in warning for warning in result.warnings)
 
 
 def test_plan_with_errors_is_not_built(small_plan_text):

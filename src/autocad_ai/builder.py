@@ -41,6 +41,11 @@ LAYERS: dict[str, tuple[int, str, int, bool]] = {
     "A-GLAZ": (5, "Continuous", 25, True),
     "A-FLOR-STRS": (6, "Continuous", 25, True),
     "A-FLOR-FIXT": (4, "Continuous", 18, True),
+    "A-FLOR-CASE": (4, "Continuous", 18, True),   # counters, built-in casework
+    "A-FLOR-TPTN": (4, "Continuous", 18, True),   # toilet partitions
+    "A-FLOR-HRAL": (6, "Continuous", 25, True),   # railings, parapets
+    "A-FLOR-OTLN": (7, "Continuous", 25, True),   # other outlines
+    "A-FURN": (8, "Continuous", 13, True),        # loose furniture
     "A-GRID": (1, "CENTER", 13, True),
     "A-GRID-IDEN": (1, "Continuous", 18, True),
     "A-AREA-IDEN": (2, "Continuous", 25, True),
@@ -56,9 +61,13 @@ H_ROOM, H_AREA, H_GRID, H_TAG, H_TITLE, H_SUBTITLE = 3.0, 2.0, 3.5, 2.0, 5.0, 2.
 DIM_CHAIN, DIM_OVERALL, GRID_END, GRID_TOP, BUBBLE_R = 12.0, 20.0, 28.0, 8.0, 4.0
 TITLE_GAP = 12.0  # gap between the lowest grid bubble and the plan title
 
-SHEET_W, SHEET_H, BORDER = 420.0, 297.0, 10.0  # ISO A3 landscape
-STRIP_W = 70.0                                  # title block strip on the right
-SHEET_MEDIA = "ISO_full_bp_A3_(420.00_x_297.00_MM)"
+SHEET_SIZES = {"A4": (297.0, 210.0), "A3": (420.0, 297.0), "A2": (594.0, 420.0), "A1": (841.0, 594.0)}
+BORDER = 10.0   # sheet border, mm
+STRIP_W = 70.0  # landscape sheets: title block strip on the right
+STRIP_H = 48.0  # portrait sheets: title block strip along the bottom
+
+LINE_LAYERS = {"casework": "A-FLOR-CASE", "partition": "A-FLOR-TPTN", "railing": "A-FLOR-HRAL",
+               "outline": "A-FLOR-OTLN", "furniture": "A-FURN"}
 
 
 @dataclass
@@ -90,12 +99,16 @@ def _new_document(plan: Plan) -> Drawing:
     header["$TEXTSTYLE"] = TEXT_STYLE
 
     scale = plan.project.scale
+    in_metres = plan.project.dimension_unit == "m"
     dimstyle = doc.dimstyles.new(f"PLAN-{scale}", dxfattribs={
         "dimscale": scale,   # all sizes below are paper mm, multiplied by the scale
         "dimtxt": 2.5, "dimexe": 1.5, "dimexo": 1.0, "dimgap": 0.8, "dimdle": 1.5,
         "dimtad": 1,         # text above the dimension line
         "dimtih": 0, "dimtoh": 0,  # text aligned with the dimension line
-        "dimdec": 0, "dimlunit": 2, "dimtxsty": TEXT_STYLE,
+        "dimlunit": 2, "dimtxsty": TEXT_STYLE,
+        # Metres: measure in mm but show mm x 0.001 with two decimals, e.g. 15000 -> 15.00.
+        "dimlfac": 0.001 if in_metres else 1.0, "dimdec": 2 if in_metres else 0, "dimzin": 0,
+        "dimdsep": ord("."),  # decimal point (the ISO default would be a comma)
     })
     dimstyle.set_tick(1.5)   # architectural tick marks instead of arrows
     header["$DIMSTYLE"] = dimstyle.dxf.name
@@ -126,6 +139,12 @@ def _define_blocks(doc: Drawing) -> None:
     window.add_line((0, -0.5), (0, 0.5))
     window.add_line((1, -0.5), (1, 0.5))
 
+    slide = doc.blocks.new("DOOR-SLIDE")  # same frame as WINDOW: two overlapping sliding panels
+    slide.add_line((0, -0.5), (0, 0.5))
+    slide.add_line((1, -0.5), (1, 0.5))
+    slide.add_lwpolyline([(0, 0), (0.55, 0), (0.55, 0.22), (0, 0.22)], close=True)
+    slide.add_lwpolyline([(0.45, -0.22), (1, -0.22), (1, 0), (0.45, 0)], close=True)
+
     # Fixtures: origin = centre of the back edge (against the wall), facing +y.
     wc = doc.blocks.new("FIX-WC")
     wc.add_lwpolyline([(-240, 0), (240, 0), (240, 200), (-240, 200)], close=True)
@@ -144,8 +163,75 @@ def _define_blocks(doc: Drawing) -> None:
     urinal.add_lwpolyline([(-200, 0), (200, 0), (200, 60), (-200, 60)], close=True)
     urinal.add_ellipse((0, 200), major_axis=(180, 0), ratio=0.8)
 
+    _define_furniture_blocks(doc)
+
+
+def _rect(block, x0: float, y0: float, x1: float, y1: float) -> None:
+    block.add_lwpolyline([(x0, y0), (x1, y0), (x1, y1), (x0, y1)], close=True)
+
+
+def _define_furniture_blocks(doc: Drawing) -> None:
+    """Simple furniture symbols drawn in a 1 x 1 square centred on the origin.
+
+    Each insert is scaled to the item's real width (x) and depth (y); the back of the
+    item is the +y side.
+    """
+    for name, seats in (("FURN-SOFA", 3), ("FURN-LOVESEAT", 2)):
+        sofa = doc.blocks.new(name)
+        _rect(sofa, -0.5, -0.5, 0.5, 0.5)
+        sofa.add_line((-0.5, 0.2), (0.5, 0.2))      # back cushion
+        sofa.add_line((-0.42, -0.5), (-0.42, 0.2))  # arms
+        sofa.add_line((0.42, -0.5), (0.42, 0.2))
+        for k in range(1, seats):
+            x = -0.42 + 0.84 * k / seats
+            sofa.add_line((x, -0.45), (x, 0.2))
+    table = doc.blocks.new("FURN-TABLE")
+    _rect(table, -0.5, -0.5, 0.5, 0.5)
+    _rect(table, -0.45, -0.4, 0.45, 0.4)
+    desk = doc.blocks.new("FURN-DESK")
+    _rect(desk, -0.5, -0.5, 0.5, 0.5)
+    _rect(desk, 0.15, -0.45, 0.45, 0.45)          # drawer unit
+    hutch = doc.blocks.new("FURN-HUTCH")
+    _rect(hutch, -0.5, -0.5, 0.5, 0.5)
+    hutch.add_line((-0.5, -0.2), (0.5, -0.2))
+    hutch.add_line((0, -0.5), (0, -0.2))
+    plant = doc.blocks.new("FURN-PLANT")
+    plant.add_circle((0, 0), 0.5)
+    plant.add_circle((0, 0), 0.12)
+    for k in range(8):
+        a = math.radians(22.5 + 45 * k)
+        plant.add_line((0.16 * math.cos(a), 0.16 * math.sin(a)), (0.46 * math.cos(a), 0.46 * math.sin(a)))
+    piano = doc.blocks.new("FURN-PIANO")          # grand piano: keyboard along the back (+y)
+    piano.add_lwpolyline([(-0.5, 0.5, 0), (0.5, 0.5, 0), (0.5, -0.05, -0.414), (-0.05, -0.5, 0),
+                          (-0.5, -0.5, 0)], format="xyb", close=True)
+    piano.add_line((-0.5, 0.35), (0.5, 0.35))
+    dining = doc.blocks.new("FURN-DINING")        # table with three chairs per side and one per end
+    _rect(dining, -0.4, -0.3, 0.4, 0.3)
+    for x in (-0.25, 0.0, 0.25):
+        _rect(dining, x - 0.07, 0.34, x + 0.07, 0.48)
+        _rect(dining, x - 0.07, -0.48, x + 0.07, -0.34)
+    _rect(dining, 0.43, -0.1, 0.5, 0.1)
+    _rect(dining, -0.5, -0.1, -0.43, 0.1)
+    fridge = doc.blocks.new("FURN-FRIDGE")
+    _rect(fridge, -0.5, -0.5, 0.5, 0.5)
+    fridge.add_line((-0.5, -0.3), (0.5, -0.3))   # door
+    fridge.add_line((-0.5, -0.3), (0.5, 0.5))
+    stove = doc.blocks.new("FURN-RANGE")
+    _rect(stove, -0.5, -0.5, 0.5, 0.5)
+    for x, y in ((-0.22, -0.2), (0.22, -0.2), (-0.22, 0.2), (0.22, 0.2)):
+        stove.add_circle((x, y), 0.13)
+    bar = doc.blocks.new("FURN-WETBAR")
+    _rect(bar, -0.5, -0.5, 0.5, 0.5)
+    _rect(bar, -0.18, -0.3, 0.18, 0.1)            # bar sink
+    stool = doc.blocks.new("FURN-STOOL")
+    stool.add_circle((0, 0), 0.5)
+
 
 FIXTURE_BLOCKS = {"wc": "FIX-WC", "lavatory": "FIX-LAV", "kitchen_sink": "FIX-KSINK", "urinal": "FIX-URINAL"}
+FURNITURE_BLOCKS = {"sofa": "FURN-SOFA", "loveseat": "FURN-LOVESEAT", "table": "FURN-TABLE",
+                    "desk": "FURN-DESK", "hutch": "FURN-HUTCH", "plant": "FURN-PLANT", "piano": "FURN-PIANO",
+                    "dining_set": "FURN-DINING", "refrigerator": "FURN-FRIDGE", "range": "FURN-RANGE",
+                    "wet_bar": "FURN-WETBAR", "stool": "FURN-STOOL"}
 
 
 # ------------------------------------------------------------------- drawing
@@ -160,8 +246,9 @@ class _LevelDrawer:
         self.ox, self.oy = origin
         self.s = plan.project.scale
         self.counts = {"walls": len(level.walls), "doors": 0, "windows": 0, "openings": 0,
-                       "rooms": 0, "stairs": 0, "fixtures": 0, "columns": 0}
+                       "rooms": 0, "stairs": 0, "fixtures": 0, "furniture": 0, "columns": 0}
         self.room_areas: list[tuple[str, str, float]] = []
+        self._start = len(self.msp)  # index of this level's first entity in model space
 
     # helpers ------------------------------------------------------------------
     def p(self, x: float, y: float) -> tuple[float, float]:
@@ -210,10 +297,12 @@ class _LevelDrawer:
                 "layer": "A-DOOR", "xscale": w, "yscale": yscale, "rotation": rotation})
             self.counts["doors"] += 1
             tag_side = -side
-        elif opening.type == "window":
-            self.msp.add_blockref("WINDOW", self.p(*frame.at(a)), dxfattribs={
-                "layer": "A-GLAZ", "xscale": w, "yscale": t, "rotation": frame.angle_deg})
-            self.counts["windows"] += 1
+        elif opening.type in ("window", "sliding_door"):
+            is_window = opening.type == "window"
+            self.msp.add_blockref("WINDOW" if is_window else "DOOR-SLIDE", self.p(*frame.at(a)), dxfattribs={
+                "layer": "A-GLAZ" if is_window else "A-DOOR", "xscale": w, "yscale": t,
+                "rotation": frame.angle_deg})
+            self.counts["windows" if is_window else "doors"] += 1
             tag_side = -1
         else:
             self.counts["openings"] += 1
@@ -266,7 +355,7 @@ class _LevelDrawer:
                 self.msp.add_circle(self.p(x0 - GRID_END * s - r, y), r, dxfattribs={"layer": "A-GRID-IDEN"})
                 self.text(label, (x0 - GRID_END * s - r, y), H_GRID, "A-GRID-IDEN")
         # Chain of bay dimensions, then one overall dimension further out.
-        for values, horizontal in ((xs, True), (ys, False)):
+        for values, horizontal in ((xs, True), (ys, False)) if self.level.auto_dimensions else ():
             rows = [(DIM_CHAIN, list(zip(values, values[1:])))]
             if len(values) > 2:
                 rows.append((DIM_OVERALL, [(values[0], values[-1])]))
@@ -283,8 +372,13 @@ class _LevelDrawer:
                                                 p2=self.p(x0 - 3 * s, b), angle=90, dimstyle=style,
                                                 dxfattribs=dim).render()
         for extra in self.level.dimensions:
-            self.msp.add_aligned_dim(self.p(*extra.p1), self.p(*extra.p2), distance=extra.offset,
-                                     dimstyle=style, dxfattribs=dim).render()
+            if extra.kind == "aligned":
+                self.msp.add_aligned_dim(self.p(*extra.p1), self.p(*extra.p2), distance=extra.offset,
+                                         dimstyle=style, dxfattribs=dim).render()
+            else:  # horizontal / vertical: measures only the x or y difference
+                self.msp.add_linear_dim(base=self.p(*extra.at), p1=self.p(*extra.p1), p2=self.p(*extra.p2),
+                                        angle=0 if extra.kind == "horizontal" else 90, dimstyle=style,
+                                        dxfattribs=dim).render()
 
     def _fit(self, height: float, text: str, room_width: float | None) -> float:
         """Shrink a label's paper height so the text fits across the room (never below 1.5 mm)."""
@@ -337,7 +431,8 @@ class _LevelDrawer:
             self.msp.add_lwpolyline([self.p(*at(run * 0.08)), self.p(*tip)], dxfattribs={"layer": "A-FLOR-STRS"})
             self.line(tip, at(run * 0.92 - head, head * 0.6), "A-FLOR-STRS")
             self.line(tip, at(run * 0.92 - head, -head * 0.6), "A-FLOR-STRS")
-            self.text(stair.label, at(-3.0 * self.s), H_ROOM, "A-FLOR-STRS", rotation=0)
+            if stair.label:
+                self.text(stair.label, stair.label_at or at(-3.0 * self.s), H_ROOM, "A-FLOR-STRS")
             self.counts["stairs"] += 1
 
     def fixtures(self) -> None:
@@ -346,14 +441,28 @@ class _LevelDrawer:
                                   dxfattribs={"layer": "A-FLOR-FIXT", "rotation": fixture.rotation})
             self.counts["fixtures"] += 1
 
+    def furniture(self) -> None:
+        for item in self.level.furniture:
+            width, depth = item.size
+            self.msp.add_blockref(FURNITURE_BLOCKS[item.kind], self.p(*item.at), dxfattribs={
+                "layer": "A-FURN", "xscale": width, "yscale": depth, "rotation": item.rotation})
+            self.counts["furniture"] += 1
+
+    def lines(self) -> None:
+        for spec in self.level.lines:
+            self.msp.add_lwpolyline([self.p(*q) for q in spec.points], close=spec.closed,
+                                    dxfattribs={"layer": LINE_LAYERS[spec.layer]})
+
     def notes(self) -> None:
         for note in self.level.notes:
             self.text(note.text, note.at, note.height, "A-ANNO-TEXT", align=TextEntityAlignment.LEFT)
 
     def title(self) -> None:
-        x0, y0, x1, _ = self.reference_box()
+        x0, _, x1, _ = self.reference_box()
         s, cx = self.s, (x0 + x1) / 2
-        lowest = y0 - (GRID_END + 2 * BUBBLE_R) * s if self.plan.grids else y0 - DIM_OVERALL * s
+        # Start below the lowest thing drawn so far for this level (dimensions, bubbles...).
+        drawn = bbox.extents(list(self.msp)[self._start:])
+        lowest = drawn.extmin.y - self.oy
         y = lowest - (TITLE_GAP + H_TITLE / 2) * s
         self.text(self.level.title, (cx, y), H_TITLE, "A-ANNO-TEXT")
         half = 0.36 * H_TITLE * s * len(self.level.title)  # rough width of Arial capitals
@@ -361,6 +470,7 @@ class _LevelDrawer:
         self.text(f"SCALE 1:{s}", (cx, y - 2.0 * H_TITLE * s), H_SUBTITLE, "A-ANNO-TEXT")
 
     def draw(self) -> None:
+        self._start = len(self.msp)
         self.walls()
         self.openings()
         self.columns()
@@ -368,6 +478,8 @@ class _LevelDrawer:
         self.rooms()
         self.stairs()
         self.fixtures()
+        self.furniture()
+        self.lines()
         self.notes()
         self.title()
 
@@ -385,56 +497,87 @@ def _mtext_safe(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
 
 
+def sheet_size(plan: Plan) -> tuple[float, float]:
+    """(width, height) of the sheet in mm, honouring the plan's size and orientation."""
+    w, h = SHEET_SIZES[plan.project.sheet_size]
+    return (h, w) if plan.project.sheet_orientation == "portrait" else (w, h)
+
+
+def _title_fields(layout, fields, x0: float, x1: float, top: float, ttlb: dict) -> float:
+    """Stack label/value boxes downwards from `top` between x0 and x1; returns the bottom y."""
+    y = top
+    chars = max(8, int((x1 - x0 - 6) / 1.9))  # how many 3 mm characters fit on one line
+    for label, value in fields:
+        height = 6.0 if label == "SHEET NO." else 3.0
+        layout.add_text(label, height=1.8, dxfattribs={**ttlb, "style": TEXT_STYLE}).set_placement(
+            (x0 + 3, y - 4), align=TextEntityAlignment.LEFT)
+        baseline = y - 6.5 - height  # value text starts below the small label
+        for text_line in textwrap.wrap(value, chars) or ["-"]:
+            layout.add_text(text_line, height=height, dxfattribs={**ttlb, "style": TEXT_STYLE}).set_placement(
+                (x0 + 3, baseline), align=TextEntityAlignment.LEFT)
+            baseline -= 1.6 * height
+        y = baseline + 1.6 * height - 3.0  # bottom of this field's box
+        layout.add_line((x0, y), (x1, y), dxfattribs=ttlb)
+    return y
+
+
 def _add_sheet(doc: Drawing, plan: Plan, level: Level, sheet_no: str,
                view: tuple[float, float, float, float], warnings: list[str]) -> str:
     name = layout_name(sheet_no, level.title)
     layout = doc.layouts.new(name)
-    layout.page_setup(size=(SHEET_W, SHEET_H), margins=(0, 0, 0, 0), units="mm",
-                      name=SHEET_MEDIA, device="DWG To PDF.pc3")
+    sheet_w, sheet_h = sheet_size(plan)
+    media = f"ISO_full_bp_{plan.project.sheet_size}_({sheet_w:.2f}_x_{sheet_h:.2f}_MM)"
+    layout.page_setup(size=(sheet_w, sheet_h), margins=(0, 0, 0, 0), units="mm",
+                      name=media, device="DWG To PDF.pc3")
     ttlb = {"layer": "A-ANNO-TTLB"}
-    left, bottom, right, top = BORDER, BORDER, SHEET_W - BORDER, SHEET_H - BORDER
-    strip = right - STRIP_W
+    left, bottom, right, top = BORDER, BORDER, sheet_w - BORDER, sheet_h - BORDER
     layout.add_lwpolyline([(left, bottom), (right, bottom), (right, top), (left, top)], close=True,
                           dxfattribs={**ttlb, "const_width": 0.5})
-    layout.add_line((strip, bottom), (strip, top), dxfattribs=ttlb)
 
-    # Title block: label/value pairs from the top of the strip downwards.
     project = plan.project
     fields = [("PROJECT", project.name), ("LOCATION", project.location or "-"),
               ("SHEET TITLE", level.title), ("SCALE", f"1:{project.scale}"),
               ("DATE", dt.date.today().isoformat()), ("SHEET NO.", sheet_no)]
-    y = top
-    for label, value in fields:
-        height = 6.0 if label == "SHEET NO." else 3.0
-        lines = textwrap.wrap(value, 22) or ["-"]
-        layout.add_text(label, height=1.8, dxfattribs={**ttlb, "style": TEXT_STYLE}).set_placement(
-            (strip + 3, y - 4), align=TextEntityAlignment.LEFT)
-        baseline = y - 6.5 - height  # value text starts below the small label
-        for text_line in lines:
-            layout.add_text(text_line, height=height, dxfattribs={**ttlb, "style": TEXT_STYLE}).set_placement(
-                (strip + 3, baseline), align=TextEntityAlignment.LEFT)
-            baseline -= 1.6 * height
-        y = baseline + 1.6 * height - 3.0  # bottom of this field's box
-        layout.add_line((strip, y), (right, y), dxfattribs=ttlb)
     notes = project.notes + ["Generated with autocad-ai (AI-assisted). Check all dimensions on site."]
-    mtext = layout.add_mtext("NOTES:\\P" + "\\P".join(f"- {_mtext_safe(n)}" for n in notes),
-                             dxfattribs={**ttlb, "style": TEXT_STYLE, "char_height": 2.0, "width": STRIP_W - 6})
-    mtext.set_location((strip + 3, y - 3), attachment_point=MTextEntityAlignment.TOP_LEFT)
+    notes_text = "NOTES:\\P" + "\\P".join(f"- {_mtext_safe(n)}" for n in notes)
+
+    if project.sheet_orientation == "landscape":
+        # Title block strip on the right: fields stacked from the top, then the notes.
+        strip = right - STRIP_W
+        layout.add_line((strip, bottom), (strip, top), dxfattribs=ttlb)
+        y = _title_fields(layout, fields, strip, right, top, ttlb)
+        notes_at, notes_width = (strip + 3, y - 3), STRIP_W - 6
+        area = (left, bottom, strip, top)
+    else:
+        # Title block strip along the bottom: three columns of two fields, then the notes.
+        strip = bottom + STRIP_H
+        layout.add_line((left, strip), (right, strip), dxfattribs=ttlb)
+        column = (right - left) * 0.2
+        for k in range(3):
+            x0 = left + k * column
+            _title_fields(layout, fields[2 * k:2 * k + 2], x0, x0 + column, strip, ttlb)
+            layout.add_line((x0 + column, bottom), (x0 + column, strip), dxfattribs=ttlb)
+        notes_at, notes_width = (left + 3 * column + 3, strip - 3), right - left - 3 * column - 6
+        area = (left, strip, right, top)
+    mtext = layout.add_mtext(notes_text, dxfattribs={**ttlb, "style": TEXT_STYLE, "char_height": 2.0,
+                                                     "width": notes_width})
+    mtext.set_location(notes_at, attachment_point=MTextEntityAlignment.TOP_LEFT)
 
     # Viewport onto model space at exactly 1:scale. It is sized to this level's drawing
     # (plus a small margin) so the neighbouring level in model space stays out of view.
-    area_w, area_h = strip - left - 10, top - bottom - 10  # drawing area left of the title strip
+    area_w, area_h = area[2] - area[0] - 10, area[3] - area[1] - 10
     x0, y0, x1, y1 = view
     margin = 5.0  # paper mm around the level
     vp_w = (x1 - x0) / project.scale + 2 * margin
     vp_h = (y1 - y0) / project.scale + 2 * margin
     view_height = vp_h * project.scale  # model mm shown top-to-bottom: the level plus margins
     if vp_w > area_w or vp_h > area_h:
-        # Too big for A3 at this scale: shrink the frame, keep the same view (= zoom out).
+        # Too big for the sheet at this scale: shrink the frame, keep the same view (= zoom out).
         fit = max(vp_w / area_w, vp_h / area_h)
         vp_w, vp_h = vp_w / fit, vp_h / fit
-        warnings.append(f"{name}: level does not fit an A3 sheet at 1:{project.scale}; viewport zoomed out")
-    layout.add_viewport(center=((left + strip) / 2, (bottom + top) / 2), size=(vp_w, vp_h),
+        warnings.append(f"{name}: level does not fit an {project.sheet_size} {project.sheet_orientation} sheet "
+                        f"at 1:{project.scale}; viewport zoomed out")
+    layout.add_viewport(center=((area[0] + area[2]) / 2, (area[1] + area[3]) / 2), size=(vp_w, vp_h),
                         view_center_point=((x0 + x1) / 2, (y0 + y1) / 2), view_height=view_height,
                         dxfattribs={"layer": "A-ANNO-VPRT"})
     return name
